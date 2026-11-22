@@ -922,7 +922,7 @@ if(!S.temaV){S.tema="noval";S.temaV=2}
 if(S.gradV!==3||!S.grad||typeof S.grad!=="object"){S.grad={noval:"biru",light:"biru"};S.gradV=3}
 if(S.tema!=="noval"&&S.tema!=="light")S.tema=["light","korporat","zamrud","marun","gading","slate"].includes(S.tema)?"light":"noval";
 document.documentElement.dataset.theme=S.tema;document.documentElement.dataset.grad=S.grad[S.tema]||"biru";
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(window.fbPush)window.fbPush()};
 const $=id=>document.getElementById(id);
 const rp=n=>(n<0?"-":"")+"Rp "+Math.abs(Number(n)||0).toLocaleString("id-ID");
 const num=v=>Number((v||"").replace(/\D/g,""))||0;
@@ -1659,7 +1659,7 @@ function ambilFoto(label){
   });
 }
 function pangkasFoto(){const batas=Date.now()-30*864e5;absList().forEach(a=>{if(new Date(a.masuk).getTime()<batas){delete a.foto;delete a.fotoPulang}})}
-function simpanAbsen(){try{localStorage.setItem(KEY,JSON.stringify(S));return true}catch(e){toast("Penyimpanan penuh, absen gagal disimpan",true);return false}}
+function simpanAbsen(){try{localStorage.setItem(KEY,JSON.stringify(S));if(window.fbPush)window.fbPush();return true}catch(e){toast("Penyimpanan penuh, absen gagal disimpan",true);return false}}
 function fotoBesar(id,k){const a=absList().find(x=>x.id===id);if(!a||!a[k])return;openMod(`<h3>${esc(a.kasir)} · ${k==="foto"?"Masuk":"Pulang"}</h3><img src="${a[k]}" style="width:100%;border-radius:12px"><div class="actions" style="margin-top:16px"><button class="btn main" onclick="closeMod()">Tutup</button></div>`)}
 const thumb=(a,k)=>a[k]?`<img class="fth" src="${a[k]}" onclick="fotoBesar(${a.id},'${k}')" alt="foto">`:"";
 function ambilLokasi(){
@@ -1750,5 +1750,61 @@ document.querySelector("aside .brand").addEventListener("click",()=>{if(innerWid
 /* ---------- loading klik (navigasi & tombol aksi) ---------- */
 
 </script>
+
+<script type="module">
+/* ===== FIREBASE: sinkron data antar perangkat ===== */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBo9cIvfy_1qRC5T5Wvx3nNeDMdq-fSCHg",
+  authDomain: "office-noval.firebaseapp.com",
+  projectId: "office-noval",
+  storageBucket: "office-noval.firebasestorage.app",
+  messagingSenderId: "952189272601",
+  appId: "1:952189272601:web:305e6781d572cf88a1a088",
+  measurementId: "G-EJYE6MEZLJ"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const ref = doc(db, "kasir", "data");
+
+// Data lokal per perangkat (tidak ikut disinkron)
+const LOKAL = ["tema","temaV","grad","gradV","kolaps","pin"];
+let timer = null, siapKirim = false;
+
+function bersih(){
+  const o = JSON.parse(JSON.stringify(S));
+  LOKAL.forEach(k => delete o[k]);
+  (o.absen || []).forEach(a => { delete a.foto; delete a.fotoPulang; }); // foto terlalu besar untuk Firestore
+  return JSON.stringify(o);
+}
+
+window.fbPush = () => {
+  if (!siapKirim) return;            // jangan kirim sebelum data awal dari cloud diterima
+  clearTimeout(timer);
+  timer = setTimeout(async () => {
+    try { await setDoc(ref, { json: bersih(), updatedAt: Date.now() }); }
+    catch (e) { console.error("Firebase gagal simpan:", e); }
+  }, 600);
+};
+
+onSnapshot(ref, snap => {
+  if (snap.metadata.hasPendingWrites) return;   // abaikan perubahan dari diri sendiri
+  if (!snap.exists()) { siapKirim = true; window.fbPush(); return; } // pertama kali: kirim data lokal
+  try {
+    const r = JSON.parse(snap.data().json);
+    const foto = {};
+    (S.absen || []).forEach(a => { foto[a.id] = { foto: a.foto, fotoPulang: a.fotoPulang }; });
+    LOKAL.forEach(k => { if (S[k] !== undefined) r[k] = S[k]; });
+    (r.absen || []).forEach(a => { if (foto[a.id]) Object.assign(a, foto[a.id]); });
+    S = Object.assign(S, r);
+    localStorage.setItem(KEY, JSON.stringify(S));
+    siapKirim = true;
+    refresh();
+  } catch (e) { console.error("Firebase gagal baca:", e); }
+}, err => console.error("Firebase error:", err));
+</script>
+
 
 </body></html>
