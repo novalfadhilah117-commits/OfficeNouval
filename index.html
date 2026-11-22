@@ -1752,9 +1752,10 @@ document.querySelector("aside .brand").addEventListener("click",()=>{if(innerWid
 </script>
 
 <script type="module">
-/* ===== FIREBASE: sinkron data antar perangkat ===== */
+/* ===== FIREBASE: login + sinkron data antar perangkat ===== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, collection, getDoc, writeBatch, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBo9cIvfy_1qRC5T5Wvx3nNeDMdq-fSCHg",
@@ -1767,43 +1768,175 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const ref = doc(db, "kasir", "data");
+const auth = getAuth(app);
 
-// Data lokal per perangkat (tidak ikut disinkron)
-const LOKAL = ["tema","temaV","grad","gradV","kolaps","pin"];
-let timer = null, siapKirim = false;
+/* ---------- halaman login ---------- */
+const css = document.createElement("style");
+css.textContent = `
+#lg{position:fixed;inset:0;z-index:99999;background:#12151f;display:none;align-items:center;justify-content:center;padding:20px;font-family:system-ui,sans-serif}
+#lg .bx{width:100%;max-width:340px;background:#1c2133;border:1px solid #2a3047;border-radius:18px;padding:24px;color:#e8eaf2}
+#lg h2{margin:0 0 4px;font-size:20px}#lg p{margin:0 0 18px;color:#8a91aa;font-size:13px}
+#lg input{width:100%;padding:12px 14px;margin-bottom:12px;border-radius:10px;border:1px solid #2a3047;background:#12151f;color:#e8eaf2;font-size:15px;box-sizing:border-box}
+#lg button{width:100%;padding:13px;border:0;border-radius:12px;background:#f3c46b;color:#2b2005;font-size:15px;font-weight:600;cursor:pointer}
+#lg button:disabled{opacity:.5}#lg .er{color:#ff7a7a;font-size:13px;min-height:18px;margin-bottom:10px}
+#lgout{position:fixed;right:10px;bottom:10px;z-index:9999;padding:6px 12px;border-radius:8px;border:1px solid #2a3047;background:#1c2133;color:#8a91aa;font-size:12px;cursor:pointer;display:none;opacity:.8}`;
+document.head.appendChild(css);
 
-function bersih(){
-  const o = JSON.parse(JSON.stringify(S));
-  LOKAL.forEach(k => delete o[k]);
-  (o.absen || []).forEach(a => { delete a.foto; delete a.fotoPulang; }); // foto terlalu besar untuk Firestore
-  return JSON.stringify(o);
+const lg = document.createElement("div");
+lg.id = "lg";
+lg.innerHTML = `<div class="bx"><h2>Office Noval</h2><p>Masuk dengan akun kamu</p>
+<input id="lgE" type="email" placeholder="Email" autocomplete="username">
+<input id="lgP" type="password" placeholder="Password" autocomplete="current-password">
+<div class="er" id="lgR"></div><button id="lgB">Masuk</button></div>`;
+document.body.appendChild(lg);
+
+const out = document.createElement("button");
+out.id = "lgout"; out.textContent = "Keluar";
+document.body.appendChild(out);
+
+const $l = id => document.getElementById(id);
+async function masuk(){
+  const b = $l("lgB"); b.disabled = true; $l("lgR").textContent = "";
+  try { await signInWithEmailAndPassword(auth, $l("lgE").value.trim(), $l("lgP").value); }
+  catch(e){ $l("lgR").textContent = "Email atau password salah"; }
+  b.disabled = false;
+}
+$l("lgB").onclick = masuk;
+$l("lgP").addEventListener("keydown", e => { if (e.key === "Enter") masuk(); });
+out.onclick = async () => { await signOut(auth); location.reload(); };
+
+/* ---------- sinkron data: tiap transaksi/laporan/absen = 1 dokumen ---------- */
+const st=document.createElement("div");
+st.style.cssText="position:fixed;left:10px;bottom:10px;z-index:9999;font-size:11px;color:#8a91aa;display:none";
+document.body.appendChild(st);
+const status=(t,ok)=>{st.style.display="block";st.style.color=ok===false?"#ff7a7a":"#8a91aa";st.textContent=t};
+
+const LOKAL=["tema","temaV","grad","gradV","kolaps","pin","user","users","shiftAktif","shiftTgl","platform"];
+const KOL={
+  trx:{c:"kasir_trx",id:x=>String(x.id),urut:(p,q)=>q.id-p.id},
+  laporan:{c:"kasir_laporan",id:x=>x.tgl+"_"+x.shift,urut:(p,q)=>(q.tgl+" "+(q.jam||""))>(p.tgl+" "+(p.jam||""))?1:-1},
+  absen:{c:"kasir_absen",id:x=>String(x.id),urut:(p,q)=>p.id-q.id}
+};
+const META = doc(db,"kasir_meta","utama"), LAMA = doc(db,"kasir","data");
+const sk = {meta:{},trx:{},laporan:{},absen:{}};    // yang terakhir diketahui ada di cloud
+const jauh = {meta:{},trx:{},laporan:{},absen:{}};  // data terbaru dari cloud
+const awal = new Set();
+let siap=false, primer=true, adaMeta=false, migJalan=false, sedang=false, ulang=false, tmr=null, pend=false;
+
+const peta = k => { const m={}; (S[k]||[]).forEach(x => { m[KOL[k].id(x)] = JSON.stringify(x); }); return m; };
+const metaLokal = () => { const m={}; Object.keys(S).forEach(k => { if(!LOKAL.includes(k) && !KOL[k] && S[k]!==undefined) m[k]=JSON.stringify(S[k]); }); return m; };
+
+async function kirim(){
+  if(!siap) return;
+  if(sedang){ ulang=true; return; }
+  sedang=true;
+  try{
+    do{
+      ulang=false; const ops=[];
+      for(const k in KOL){
+        const cur=peta(k);
+        for(const i in cur) if(sk[k][i]!==cur[i]) ops.push([k,i,cur[i]]);
+        for(const i in sk[k]) if(!(i in cur)) ops.push([k,i,null]);
+      }
+      const ml=metaLokal();
+      for(const i in ml) if(sk.meta[i]!==ml[i]) ops.push(["meta",i,ml[i]]);
+      ops.sort((p,q)=>(p[0]==="meta")-(q[0]==="meta"));
+      if(ops.length) status("Menyimpan…");
+      for(let n=0;n<ops.length;n+=400){
+        const part=ops.slice(n,n+400), b=writeBatch(db);
+        part.forEach(([k,i,j])=>{
+          if(k==="meta") b.set(META,{["k_"+i]:j},{merge:true});
+          else { const r=doc(db,KOL[k].c,i); if(j===null) b.delete(r); else b.set(r,{json:j,t:Date.now()}); }
+        });
+        await b.commit();
+        part.forEach(([k,i,j])=>{ if(j===null) delete sk[k][i]; else sk[k][i]=j; });
+      }
+    }while(ulang);
+    status("Tersinkron ✓");
+  }catch(e){
+    console.error("Firebase gagal simpan:", e);
+    status("Gagal sinkron, mencoba lagi…", false);
+    setTimeout(kirim, 8000);
+  }
+  sedang=false;
+}
+window.fbPush = () => { clearTimeout(tmr); tmr=setTimeout(kirim,600); };
+
+function tryRefresh(){
+  const a=document.activeElement;
+  if(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)){ pend=true; return; }
+  pend=false; refresh();
+}
+setInterval(()=>{ if(pend) tryRefresh(); }, 2000);
+
+function terapkan(){
+  let ubah=false;
+  for(const k in KOL){
+    const loc=peta(k), kotor={}, hapus={};
+    if(!primer){
+      for(const i in loc) if(sk[k][i]!==loc[i]) kotor[i]=1;
+      for(const i in sk[k]) if(!(i in loc)) hapus[i]=1;
+    }
+    const arr=[];
+    new Set([...Object.keys(jauh[k]),...Object.keys(kotor)]).forEach(i=>{
+      if(hapus[i]) return;
+      arr.push(JSON.parse(kotor[i]?loc[i]:jauh[k][i]));
+    });
+    arr.sort(KOL[k].urut);
+    if(JSON.stringify(arr)!==JSON.stringify(S[k]||[])){ S[k]=arr; ubah=true; }
+    sk[k]={...jauh[k]};
+  }
+  for(const i in jauh.meta){
+    if(LOKAL.includes(i)||KOL[i]) continue;
+    const lj=S[i]===undefined?undefined:JSON.stringify(S[i]);
+    const kotor=!primer && lj!==undefined && lj!==sk.meta[i];
+    if(!kotor && lj!==jauh.meta[i]){ S[i]=JSON.parse(jauh.meta[i]); ubah=true; }
+  }
+  sk.meta={...jauh.meta};
+  if(ubah){ try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){} tryRefresh(); }
 }
 
-window.fbPush = () => {
-  if (!siapKirim) return;            // jangan kirim sebelum data awal dari cloud diterima
-  clearTimeout(timer);
-  timer = setTimeout(async () => {
-    try { await setDoc(ref, { json: bersih(), updatedAt: Date.now() }); }
-    catch (e) { console.error("Firebase gagal simpan:", e); }
-  }, 600);
-};
+async function migrasi(){
+  if(migJalan) return; migJalan=true;
+  const punya=(S.trx&&S.trx.length)||(S.laporan&&S.laporan.length)||(S.absen&&S.absen.length);
+  if(!punya){
+    try{
+      const o=await getDoc(LAMA);   // data lama (1 dokumen besar)
+      if(o.exists()){ const r=JSON.parse(o.data().json); LOKAL.forEach(k=>delete r[k]); Object.assign(S,r); }
+    }catch(e){ console.error("Baca data lama gagal:", e); }
+  }
+  primer=false; siap=true; kirim();   // kirim semua ke format baru
+}
 
-onSnapshot(ref, snap => {
-  if (snap.metadata.hasPendingWrites) return;   // abaikan perubahan dari diri sendiri
-  if (!snap.exists()) { siapKirim = true; window.fbPush(); return; } // pertama kali: kirim data lokal
-  try {
-    const r = JSON.parse(snap.data().json);
-    const foto = {};
-    (S.absen || []).forEach(a => { foto[a.id] = { foto: a.foto, fotoPulang: a.fotoPulang }; });
-    LOKAL.forEach(k => { if (S[k] !== undefined) r[k] = S[k]; });
-    (r.absen || []).forEach(a => { if (foto[a.id]) Object.assign(a, foto[a.id]); });
-    S = Object.assign(S, r);
-    localStorage.setItem(KEY, JSON.stringify(S));
-    siapKirim = true;
-    refresh();
-  } catch (e) { console.error("Firebase gagal baca:", e); }
-}, err => console.error("Firebase error:", err));
+function lanjut(){
+  if(awal.size<4) return;
+  if(!siap){
+    if(adaMeta){ terapkan(); primer=false; siap=true; kirim(); }
+    else migrasi();
+  } else { terapkan(); kirim(); }
+}
+
+let mulai1=false;
+function mulaiSinkron(){
+  if(mulai1) return; mulai1=true;
+  const gagal = e => { console.error("Firebase error:", e); status("Tidak tersambung (cek Rules)", false); };
+  Object.keys(KOL).forEach(k=>{
+    onSnapshot(collection(db,KOL[k].c), s=>{
+      jauh[k]={}; s.forEach(d=>{ jauh[k][d.id]=d.data().json; });
+      awal.add(k); lanjut();
+    }, gagal);
+  });
+  onSnapshot(META, s=>{
+    adaMeta=s.exists(); jauh.meta={};
+    if(adaMeta) Object.entries(s.data()).forEach(([f,v])=>{ if(f.startsWith("k_")) jauh.meta[f.slice(2)]=v; });
+    awal.add("meta"); lanjut();
+  }, gagal);
+}
+
+onAuthStateChanged(auth, user => {
+  if (user) { lg.style.display = "none"; out.style.display = "block"; mulaiSinkron(); }
+  else { lg.style.display = "flex"; out.style.display = "none"; }
+});
 </script>
 
 
