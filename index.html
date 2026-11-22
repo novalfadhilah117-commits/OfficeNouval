@@ -427,10 +427,30 @@ aside .sp{flex:1 0 8px}
 }
 @media(min-width:901px){#pbKeluar{color:var(--bad)}}
 @media(max-width:900px){#pbKeluar{display:none}}
+/* menu samping: kecilkan / besarkan */
+#miniTog{opacity:.8;margin-bottom:2px}#miniTog svg{transition:transform .2s}
+@media(min-width:901px){body{transition:grid-template-columns .2s}
+body.mini{grid-template-columns:76px 1fr!important}
+body.mini aside{padding-left:10px;padding-right:10px;overflow-x:hidden}
+body.mini aside .nav{font-size:0;justify-content:center;padding:11px 0;gap:0}
+body.mini aside .nav span{font-size:14px;width:auto}
+body.mini aside .brand{font-size:0;justify-content:center;padding-left:0;padding-right:0}
+body.mini aside .brand small,body.mini aside .grp,body.mini #shiftSel,body.mini .uinfo .un,body.mini #reset{display:none}
+body.mini .uinfo{justify-content:center}
+body.mini #miniTog svg{transform:rotate(180deg)}}
+@media(max-width:900px){#miniTog{display:none}}
+/* hitung akhir shift: Pagi | Sore | Gabungan */
+.kolom3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:14px}
+.kol .rl,#aHist .rl{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+.kol .rl b.bad{color:var(--bad)}.kol .jt{font-size:12px;font-weight:600;color:var(--mute);margin:12px 0 2px}
+.kol .tot{display:flex;justify-content:space-between;align-items:baseline;margin-top:12px;font-weight:700}.kol .tot b{font-size:19px}
+#aTunai{font-size:26px;font-weight:700;width:100%}
+.laci{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}.laci>div{background:var(--bg);border-radius:14px;padding:12px}.laci small{display:block;color:var(--mute);font-size:12px}.laci b{font-size:19px}
 </style>
 
 <aside>
   <div class="brand">Office Noval <small id="brSub"></small></div>
+  <button class="nav" id="miniTog" title="Kecilkan / besarkan menu"><span><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg></span>Kecilkan menu</button>
   <select id="shiftSel"></select>
   <div class="grp">Shift aktif</div>
   <button class="nav" data-v="dashboard"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>Dashboard</button>
@@ -526,7 +546,12 @@ aside .sp{flex:1 0 8px}
 <!-- AKHIR -->
 <section class="view" id="v-akhir">
   <h1>Hitung Akhir Shift</h1><div class="sub" id="aSub"></div>
-  <div class="card" id="aLap"></div>
+  <div class="kolom3" id="aKolom"></div>
+  <div class="card" id="aLaci"><h3>Hitung uang tunai di laci kas</h3><input id="aTunai" inputmode="numeric" placeholder="Rp 0" autocomplete="off">
+    <div class="laci"><div><small>Sistem (Total Uang)</small><b id="aSis">-</b></div><div><small>Selisih</small><b id="aSel">-</b></div></div>
+    <div class="sub" style="margin:0">Jika ada selisih, hitung ulang uang tunai. Jika selisih tetap ada, tuliskan penyebabnya di catatan.</div></div>
+  <div class="card" id="aHist"></div>
+  <div class="card" id="aLap" style="display:none"></div>
   <div class="card"><h3>Catatan dan kirim</h3>
     <div class="full"><input id="catat" placeholder="Catatan shift (opsional)"></div>
     <div class="actions"><button class="btn ghost" id="bSalin">Salin laporan</button><button class="btn main" id="bSubmit">Submit laporan shift</button></div>
@@ -982,7 +1007,7 @@ function rDashboard(){
     card("Transfer Bank",rp(sum(L,tb)),cntOf(L,tb)+" transaksi",null,"Transfer Bank")+
     card("Multi",rp(sum(L,["Multi"])),jmlOf("Multi")+" transaksi","Multi")+
     card("Qasir",rp(sum(L,["Qasir"])),jmlOf("Qasir")+" produk","Qasir")+
-    card("FastPay",rp(sum(L,["FastPay"])),cntOf(L,["FastPay"])+" transaksi")+
+    card("FastPay",rp(sum(L,["FastPay"])),cntOf(L,["FastPay"])+" transaksi",null,"FastPay")+
     card("Tarik Tunai",rp(sum(L,["Tarik Tunai"])),cntOf(L,["Tarik Tunai"])+" transaksi",null,"Tarik Tunai");
   $("dSaldo").innerHTML=Object.entries(S.saldo).map(([k,v])=>`<div class="li"><div class="n"><span style="display:inline-block;min-width:34px;padding:6px 0;margin-right:10px;text-align:center;border-radius:8px;background:var(--bg);font-size:11px;font-weight:700;color:var(--mute)">${k.slice(0,3).toUpperCase()}</span>${k}<small>${SALDO_INFO[k]||"Rekening"}</small></div><b>${rp(v)}</b><button class="sm" onclick="kelola('${k}')">Kelola</button></div>`).join("");
   $("dOut").innerHTML=[["OUT","Pengeluaran"],["OUT Lainnya","Pengeluaran lain"],["UM","Uang makan"]].map(([k,d])=>`<div class="li"><div class="n">${k}<small>${d}</small></div><b>${rp(sum(L,[k]))}</b><button class="sm" onclick="kelolaOut('${k}')">Kelola</button></div>`).join("");
@@ -1344,15 +1369,31 @@ function rAkhir(){
   if(S.akhirTgl!==today()){S.akhirTgl=today();S.modal=0;S.akhir={pec:{},bank:{},catat:""}}
   const sh=shiftNow(),sudah=S.laporan.find(l=>l.tgl===today()&&l.shift===sh.n);
   $("aSub").textContent=tglPanjang()+" · Shift "+sh.n+" · "+KASIR+(sh.n==="Sore"?" · dihitung gabungan Pagi + Sore":"");
-  $("catat").value=S.akhir.catat||"";
+  $("catat").value=S.akhir.catat||"";$("aTunai").value=S.akhir.tunai?fk(S.akhir.tunai):"";
   $("bSubmit").disabled=!!sudah;$("bSubmit").textContent=sudah?"Laporan shift sudah disubmit":"Submit laporan shift";
   hitungAkhir();
 }
 function hitungAkhir(){
-  rLapTeks();
+  rLapTeks();rKolom();
   document.querySelectorAll("[data-sel]").forEach(el=>{const b=el.dataset.sel,a=S.akhir.bank[b];if(a===undefined){el.textContent="";return}const d=a-S.saldo[b];el.textContent=d===0?"cocok":(d>0?"+":"")+rp(d);el.className=d===0?"pos":"neg"});
   save();
 }
+/* ---- tampilan hitung akhir shift: Pagi | Sore | Gabungan + laci kas + history ---- */
+function rKolom(){
+  const el=$("aKolom");if(!el)return;
+  const P=hitungLaporan("Pagi"),M=hitungLaporan("Sore"),G=hitungKeseluruhan(),sore=shiftNow().n==="Sore";
+  const baris=[["Transfer Bank","Transfer Bank"],["Admin TF","Admin Transfer Bank"],["Multi","Multi"],["FastPay","FastPay"],["Qasir","Qasir"],["Tarik Tunai","Tarik Tunai"],["OUT","OUT"],["OUT Lainnya","OUT Lainnya"],["UM","UM"]],neg=["Tarik Tunai","OUT","OUT Lainnya"];
+  const kol=(jd,r)=>`<div class="card kol"><h3>${jd}</h3>${baris.map(([n,k])=>{const x=r.rows.find(y=>y.k===k),v=x?x.v:0,m=neg.includes(k)&&v>0;return `<div class="rl"><span>${n}</span><b class="${m?"bad":""}">${m?"− ":""}${rp(v)}</b></div>`}).join("")}
+    <div class="jt">Jumlah transaksi</div><div class="rl"><span>Tarik Tunai</span><b>${r.cnt.c_tt}</b></div><div class="rl"><span>Trx Qasir</span><b>${r.cnt.c_qasir}</b></div><div class="rl"><span>Trx Multi</span><b>${r.cnt.c_multi}</b></div>
+    <div class="tot"><span>Total Uang</span><b>${rp(r.total)}</b></div></div>`;
+  el.innerHTML=kol("Shift Pagi",P)+kol("Shift Sore",M)+kol("Gabungan Harian",G);
+  const sis=sore?G.total:P.total,tn=S.akhir.tunai,sl=$("aSel");
+  $("aSis").textContent=rp(sis);
+  if(!tn){sl.textContent="-";sl.className=""}else{const d=tn-sis;sl.textContent=d===0?"Cocok":(d>0?"+":"")+rp(d);sl.className=d===0?"pos":"neg"}
+  const H={};S.trx.filter(t=>t.tgl===today()).forEach(t=>{const h=H[t.platform]=H[t.platform]||{n:0,v:0};h.n++;h.v+=t.nominal});
+  $("aHist").innerHTML="<h3>History input transaksi</h3>"+(Object.keys(H).map(p=>`<div class="rl"><span>${esc(p)} <small>(${H[p].n})</small></span><b>${rp(H[p].v)}</b></div>`).join("")||'<div class="empty">Belum ada transaksi hari ini</div>');
+}
+$("aTunai").addEventListener("input",e=>{const v=num(e.target.value);e.target.value=v?fk(v):"";S.akhir.tunai=v||undefined;save();rKolom()});
 $("catat").addEventListener("input",e=>{S.akhir.catat=e.target.value;save();rLapTeks()});
 function laporanTeks(){
   const sh=shiftNow(),{rows,total,qris,cnt}=hitungLaporan();
@@ -1488,6 +1529,10 @@ function rRiwayat(){
   $("rwRows").innerHTML=html||'<tr><td colspan="9" class="empty">Belum ada laporan pada rentang ini</td></tr>';
 }
 
+/* menu samping: ingat pilihan kecil/besar */
+(function(){const b=document.body,k="miniMenu";try{if(localStorage.getItem(k)==="1")b.classList.add("mini")}catch(e){}
+document.querySelectorAll("aside .nav").forEach(n=>{if(!n.title)n.title=n.textContent.trim()});
+$("miniTog").onclick=()=>{b.classList.toggle("mini");try{localStorage.setItem(k,b.classList.contains("mini")?"1":"0")}catch(e){}}})();
 $("burger").onclick=()=>document.body.classList.toggle("menu");$("bd").onclick=()=>document.body.classList.remove("menu");
 /* ---------- login ---------- */
 // Catatan: akun & password hanya tersimpan di browser ini (bukan keamanan sungguhan)
