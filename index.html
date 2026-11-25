@@ -1,5 +1,6 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Office Noval</title>
+<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#12151f"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Cdefs%3E%3ClinearGradient id=%22g%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%238b5cf6%22/%3E%3Cstop offset=%221%22 stop-color=%22%235b21b6%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22url%28%23g%29%22/%3E%3Cpath d=%22M18 48V16H27L38 33V16H46V48H37L26 31V48Z%22 fill=%22%23fff%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap">
 <style>
@@ -469,7 +470,10 @@ body.mini #miniTog svg{transform:rotate(180deg)}}
   <button class="nav" id="panduan"><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>Panduan Penggunaan</button>
   <div class="sp"></div>
   <div class="uinfo" id="uInfo"></div>
-  <button class="nav" id="logout"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>Logout</button>
+  <button class="nav" id="cariBtn"><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>Cari Transaksi</button>
+<button class="nav" id="rekapBtn"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></span>Rekap Admin &amp; Ekspor</button>
+<button class="nav" id="logBtn"><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Riwayat Perubahan</button>
+<button class="nav" id="logout"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>Logout</button>
   <button class="nav" id="reset">Reset data</button>
 </aside>
 <div class="topbar"><button class="burger" id="burger" aria-label="Menu">☰</button><span>Office Noval</span></div>
@@ -635,12 +639,12 @@ body.mini #miniTog svg{transform:rotate(180deg)}}
 <div class="foot">Office Noval · versi web · data tersimpan di browser ini</div>
 </main>
 <div class="login" id="login" style="display:none"><div class="mod" style="max-width:360px">
-  <h3 style="font-size:20px">Office Noval</h3><div class="sub" style="margin:0 0 14px">Masuk dengan username dan password yang terdaftar.</div>
-  <label>Username</label><input id="lgUser" autocomplete="username"><div style="height:12px"></div>
-  <label>Password</label><input id="lgPw" type="password" autocomplete="current-password">
+  <h3 style="font-size:20px">Office Noval</h3><div class="sub" style="margin:0 0 14px">Ketik nama kamu untuk mulai. Shift terdeteksi otomatis sesuai jam.</div>
+  <label>Nama</label><input id="lgUser" value="Noval" autocomplete="off"><div style="height:12px"></div>
+  <select id="lgShift" style="display:none"></select><input id="lgPw" type="hidden">
   <div id="lgErr" class="neg" style="font-size:13px;min-height:20px;margin:8px 0"></div>
-  <div class="actions"><button class="btn main" id="lgBtn">Masuk</button></div>
-  <div class="sub" style="margin:12px 0 0;font-size:12px">Belum punya akun? Minta ke pemilik toko. Data tersimpan di browser ini.</div>
+  <div class="actions"><button class="btn main" id="lgBtn">Mulai</button></div>
+  <div class="sub" style="margin:12px 0 0;font-size:12px">Nama ini tercatat di setiap transaksi dan laporan.</div>
 </div></div>
 <div class="ov" id="ov"><div class="mod" id="mod"></div></div>
 <div class="toast" id="toast" style="z-index:20"></div>
@@ -899,7 +903,7 @@ let dAll=false;
 /* ===== PENGATURAN (ubah sesuai kebutuhan) ===== */
 let KASIR="";
 const PLATFORM=["Transfer Bank","Multi","FastPay","Qasir","Tarik Tunai","Transfer Alternatif"]; // OUT, OUT Lainnya, UM diinput lewat Dashboard > Kelola / Laporan Shift > Tambah
-const BANKS=["BCA","BRI","BNI","Mandiri","BTN","DANA","BSI","CIMB Niaga","Permata","Lainnya"];
+const BANKS=["BCA","BRI","BNI","Mandiri","BTN","DANA","BSI","CIMB Niaga","Permata","Seabank","Bank Jago","Bank Neo Commerce","Allo Bank","Jenius (BTPN)","blu by BCA Digital","OCBC NISP","Danamon","Maybank","Panin","Mega","Sinarmas","UOB","BJB","Bank DKI","Muamalat","KB Bukopin","OVO","GoPay","ShopeePay","LinkAja","Lainnya"];
 const SALDO_AWAL={"Permata":10493600,"CIMB Niaga":33102,"FastPay":3828485};
 const SALDO_INFO={"Permata":"Rekening cabang","CIMB Niaga":"Rekening cabang","FastPay":"Deposit"};
 // Pengaruh ke Total Uang: +1 menambah, -1 mengurangi
@@ -922,7 +926,7 @@ if(!S.temaV){S.tema="noval";S.temaV=2}
 if(S.gradV!==3||!S.grad||typeof S.grad!=="object"){S.grad={noval:"biru",light:"biru"};S.gradV=3}
 if(S.tema!=="noval"&&S.tema!=="light")S.tema=["light","korporat","zamrud","marun","gading","slate"].includes(S.tema)?"light":"noval";
 document.documentElement.dataset.theme=S.tema;document.documentElement.dataset.grad=S.grad[S.tema]||"biru";
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(window.fbPush)window.fbPush()};
+const save=()=>{try{auditCek()}catch(e){console.error(e)}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(window.fbPush)window.fbPush()};
 const $=id=>document.getElementById(id);
 const rp=n=>(n<0?"-":"")+"Rp "+Math.abs(Number(n)||0).toLocaleString("id-ID");
 const num=v=>Number((v||"").replace(/\D/g,""))||0;
@@ -1498,7 +1502,7 @@ function rCek(){
 let hMode="Hari",hTgl="",hBulan="",hTahun="",hShift="Semua",hPlat="Semua";
 const tglStr=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
 function hInit(){if(!hTgl){hTgl=today();hBulan=today().slice(0,7);hTahun=today().slice(0,4)}}
-const OUTLET="Office Noval",CEKP=["Transfer Bank","Tarik Tunai","FastPay","Qasir"];
+const OUTLET="Office Noval",CEKP=["Transfer Bank","Tarik Tunai","FastPay","Qasir","Multi"];
 let cpA="",cpB="",cpJ="Semua",cpS="Semua",cpOpen={},cpMain=false;
 const cpSt=t=>t.cs||(t.cek===true?"ok":"");
 function cpList(tgl,sec){return S.trx.filter(t=>t.tgl===tgl&&(sec==="Gabungan"||t.shift===sec)&&CEKP.includes(t.platform)).sort((a,b)=>a.waktu<b.waktu?-1:1)}
@@ -1515,7 +1519,7 @@ function rHistori(){
   S.cekNote=S.cekNote||{};
   $("hSub").textContent=OUTLET+" · cek transaksi per shift";
   const opt=(arr,cur)=>arr.map(([v,n])=>`<option value="${v}" ${v===cur?"selected":""}>${n}</option>`).join("");
-  const filter=`<div class="card cpf2"><div class="cpg2"><div><label>Jenis Transaksi</label><select onchange="cpJ=this.value;rHistori()">${opt([["Semua","Semua Jenis"],["Transfer Bank","Transfer Bank"],["Tarik Tunai","Tarik Tunai"],["FastPay","FastPay"],["Qasir","Qasir"]],cpJ)}</select></div><div><label>Status</label><select onchange="cpS=this.value;rHistori()">${opt([["Semua","Semua Status"],["ok","Sesuai"],["bad","Tidak Sesuai"],["Belum","Belum Dicek"]],cpS)}</select></div><div><label>Cabang</label><select onchange="rHistori()"><option>Semua Cabang</option><option>${OUTLET}</option></select></div><div><label>Tanggal</label><div class="cpdt"><input type="date" value="${cpA}" onchange="cpA=this.value||today();rHistori()"><span>–</span><input type="date" value="${cpB}" onchange="cpB=this.value||cpA;rHistori()"></div></div></div><div class="cpfb"><button class="btn main" onclick="rHistori()">Filter</button><button class="sm" onclick="cpReset()" title="Reset" aria-label="Reset">↻</button></div></div>`;
+  const filter=`<div class="card cpf2"><div class="cpg2"><div><label>Jenis Transaksi</label><select onchange="cpJ=this.value;rHistori()">${opt([["Semua","Semua Jenis"],["Transfer Bank","Transfer Bank"],["Tarik Tunai","Tarik Tunai"],["FastPay","FastPay"],["Qasir","Qasir"],["Multi","Multi"]],cpJ)}</select></div><div><label>Status</label><select onchange="cpS=this.value;rHistori()">${opt([["Semua","Semua Status"],["ok","Sesuai"],["bad","Tidak Sesuai"],["Belum","Belum Dicek"]],cpS)}</select></div><div><label>Cabang</label><select onchange="rHistori()"><option>Semua Cabang</option><option>${OUTLET}</option></select></div><div><label>Tanggal</label><div class="cpdt"><input type="date" value="${cpA}" onchange="cpA=this.value||today();rHistori()"><span>–</span><input type="date" value="${cpB}" onchange="cpB=this.value||cpA;rHistori()"></div></div></div><div class="cpfb"><button class="btn main" onclick="rHistori()">Filter</button><button class="sm" onclick="cpReset()" title="Reset" aria-label="Reset">↻</button></div></div>`;
   const days=[...new Set(S.trx.filter(t=>t.tgl>=cpA&&t.tgl<=cpB).map(t=>t.tgl).concat(cpA===cpB?[cpA]:[]))].sort().reverse();
   const lap=(tgl,sh)=>S.laporan.find(l=>l.tgl===tgl&&l.shift===sh);
   const sis=a=>a.reduce((s,t)=>s+efekKas(t),0);
@@ -1594,14 +1598,91 @@ function mulai(){
 const AKUN_RESMI={"noval":{nama:"noval",pw:"2060791163"},"sita":{nama:"sita",pw:"-1786792852"}};
 let gagal=0,kunciSampai=0;
 function masuk(){
-  const u=$("lgUser").value.trim(),pw=$("lgPw").value,err=$("lgErr");
-  if(Date.now()<kunciSampai){err.textContent="Terlalu banyak percobaan. Tunggu "+Math.ceil((kunciSampai-Date.now())/1000)+" detik";return}
-  if(!u||!pw){err.textContent="Isi username dan password";return}
-  const k=u.toLowerCase(),a=AKUN_RESMI[k];
-  if(!a||a.pw!==hashPw(pw)){gagal++;if(gagal>=5){gagal=0;kunciSampai=Date.now()+30000}err.textContent="Username atau password salah";return}
-  gagal=0;S.users=S.users||{};S.users[k]={nama:a.nama,pw:a.pw};
-  err.textContent="";S.user=k;S.shiftAktif=autoShift();S.shiftTgl=today();$("lgPw").value="";lTab=null;mulai();
+  const u=$("lgUser").value.trim(),err=$("lgErr");
+  if(!u){err.textContent="Isi nama dulu";return}
+  const k=u.toLowerCase();
+  S.users=S.users||{};S.users[k]={nama:u,pw:""};
+  err.textContent="";S.user=k;S.shiftAktif=$("lgShift").value;S.shiftTgl=today();lTab=null;mulai();
 }
+
+/* ---------- riwayat perubahan transaksi ---------- */
+let _prevT=null,_seq=0;
+const _skip=k=>/^(cek|cs)/.test(k);
+const _ring=t=>[t.platform,t.nominal!=null?rp(t.nominal):"",t.nama||t.ket||""].filter(Boolean).join(" · ");
+function auditReset(){_prevT={};(S.trx||[]).forEach(t=>{_prevT[t.id]=JSON.stringify(t)})}
+function auditCek(){
+  if(!_prevT){auditReset();return}
+  const cur={};(S.trx||[]).forEach(t=>{cur[t.id]=t});
+  S.log=S.log||[];
+  const add=(aksi,t,ket)=>S.log.push({id:Date.now()*100+(_seq++%100),waktu:new Date().toISOString(),kasir:(typeof KASIR!=="undefined"&&KASIR)||"-",aksi,ref:String(t.id),ringkas:_ring(t),ket:ket||""});
+  for(const id in cur){
+    if(!(id in _prevT)){add("tambah",cur[id]);continue}
+    const j=JSON.stringify(cur[id]);
+    if(_prevT[id]!==j){
+      const a=JSON.parse(_prevT[id]),b=cur[id],d=[];
+      new Set([...Object.keys(a),...Object.keys(b)]).forEach(k=>{if(!_skip(k)&&JSON.stringify(a[k])!==JSON.stringify(b[k]))d.push(k+": "+(a[k]===undefined?"-":a[k])+" \u2192 "+(b[k]===undefined?"-":b[k]))});
+      if(d.length)add("ubah",b,d.join("; "));
+    }
+  }
+  for(const id in _prevT)if(!(id in cur))add("hapus",JSON.parse(_prevT[id]));
+  auditReset();
+}
+function showLog(){
+  const L=(S.log||[]).slice().sort((a,b)=>b.id-a.id).slice(0,100),nm={tambah:"Tambah",ubah:"Ubah",hapus:"Hapus"};
+  const w=t=>{const d=new Date(t);return d.toLocaleDateString("id-ID")+" "+d.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"})};
+  openMod('<h3>Riwayat Perubahan</h3><div style="max-height:60vh;overflow:auto">'+(L.length?L.map(x=>'<div class="li"><div class="n"><b>'+nm[x.aksi]+'</b> \u00b7 '+esc(x.ringkas)+'<small>'+w(x.waktu)+' \u00b7 '+esc(x.kasir)+(x.ket?' \u00b7 '+esc(x.ket):'')+'</small></div></div>').join(""):'<div class="sub">Belum ada perubahan tercatat.</div>')+'</div><div class="actions"><button class="btn main" onclick="closeMod()">Tutup</button></div>');
+}
+
+/* ---------- saldo menipis, cari, rekap admin, ekspor ---------- */
+const BATAS_DEF=500000;
+const batasSaldo=k=>(S.batas&&S.batas[k]!=null)?S.batas[k]:BATAS_DEF;
+function cekSaldo(){
+  let el=$("saldoWarn");
+  if(!el){el=document.createElement("div");el.id="saldoWarn";const v=$("v-dashboard");v.insertBefore(el,v.firstChild)}
+  const low=Object.keys(S.saldo||{}).filter(k=>S.saldo[k]<batasSaldo(k));
+  el.innerHTML=low.length?'<div class="card" style="border-color:#ff7a7a;margin-bottom:12px"><b style="color:#ff7a7a">Saldo menipis</b><div class="sub" style="margin:6px 0 8px">'+low.map(k=>esc(k)+': '+rp(S.saldo[k])+' (batas '+rp(batasSaldo(k))+')').join('<br>')+'</div><button class="sm" onclick="aturBatas()">Atur batas</button></div>':'<div style="text-align:right;margin-bottom:8px"><button class="sm" onclick="aturBatas()">Atur batas saldo</button></div>';
+}
+function aturBatas(){
+  openMod('<h3>Batas Saldo Menipis</h3>'+Object.keys(S.saldo||{}).map(k=>'<label>'+esc(k)+'</label><input type="number" data-b="'+esc(k)+'" value="'+batasSaldo(k)+'"><div style="height:8px"></div>').join('')+'<div class="actions"><button class="btn ghost" onclick="closeMod()">Batal</button><button class="btn main" onclick="simpanBatas()">Simpan</button></div>');
+}
+function simpanBatas(){S.batas=S.batas||{};document.querySelectorAll("[data-b]").forEach(i=>{S.batas[i.dataset.b]=+i.value||0});save();closeMod();cekSaldo()}
+const _rD=rDashboard;rDashboard=function(){_rD();cekSaldo()};
+
+function cariTrx(){
+  document.body.classList.remove("menu");
+  openMod('<h3>Cari Transaksi</h3><input id="cq" placeholder="Nama, nominal, bank, kasir, tanggal" oninput="hasilCari()"><div id="cr" style="max-height:55vh;overflow:auto;margin-top:10px"></div><div class="actions"><button class="btn main" onclick="closeMod()">Tutup</button></div>');
+  hasilCari();$("cq").focus();
+}
+function hasilCari(){
+  const q=$("cq").value.trim().toLowerCase();
+  const L=(S.trx||[]).filter(t=>!q||[t.nama,t.ket,t.platform,t.sumber,t.tujuan,t.kasir,t.tgl,t.nominal].some(v=>String(v||"").toLowerCase().includes(q))).sort((a,b)=>b.id-a.id).slice(0,50);
+  $("cr").innerHTML=L.length?L.map(t=>'<div class="li"><div class="n"><b>'+esc(t.nama||t.ket||t.platform)+'</b> \u00b7 '+rp(t.nominal)+'<small>'+t.tgl+' \u00b7 '+esc(t.platform)+(t.sumber?' \u00b7 '+esc(t.sumber):'')+(t.tujuan?' \u2192 '+esc(t.tujuan):'')+' \u00b7 Shift '+t.shift+' \u00b7 '+esc(t.kasir||'-')+'</small></div></div>').join(''):'<div class="sub">Tidak ditemukan.</div>';
+}
+function rekapAdmin(){
+  document.body.classList.remove("menu");
+  const T=S.trx||[],tgl=today(),bln=tgl.slice(0,7),hari={};
+  const sum=f=>T.filter(f).reduce((s,t)=>s+(t.admin||0),0);
+  T.forEach(t=>{hari[t.tgl]=(hari[t.tgl]||0)+(t.admin||0)});
+  const row=(a,b)=>'<div class="li"><div class="n">'+a+'<small>'+rp(b)+'</small></div></div>';
+  openMod('<h3>Rekap Biaya Admin</h3>'+row('Hari ini',sum(t=>t.tgl===tgl))+row('Bulan ini',sum(t=>t.tgl.startsWith(bln)))+row('Seluruhnya',sum(()=>true))+'<div class="sub" style="margin:12px 0 6px">7 hari terakhir</div>'+Object.keys(hari).sort().reverse().slice(0,7).map(k=>row(k,hari[k])).join('')+'<div class="sub" style="margin:12px 0 6px">Ekspor transaksi bulan ini</div><div class="actions"><button class="btn ghost" onclick="ekspor(\'csv\')">Unduh Excel</button><button class="btn ghost" onclick="ekspor(\'pdf\')">Cetak / PDF</button><button class="btn main" onclick="closeMod()">Tutup</button></div>');
+}
+function ekspor(jenis){
+  const bln=today().slice(0,7),L=(S.trx||[]).filter(t=>t.tgl.startsWith(bln)).sort((a,b)=>a.id-b.id);
+  const H=["Tanggal","Jam","Shift","Kasir","Platform","Nama","Dari","Ke","Nominal","Admin","Total"];
+  const R=L.map(t=>[t.tgl,jam(t.waktu),t.shift,t.kasir||"",t.platform,t.nama||t.ket||"",t.sumber||"",t.tujuan||"",t.nominal||0,t.admin||0,(t.nominal||0)+(t.admin||0)]);
+  if(jenis==="csv"){
+    const c=v=>'"'+String(v).replace(/"/g,'""')+'"';
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob(["\ufeff"+[H,...R].map(r=>r.map(c).join(",")).join("\r\n")],{type:"text/csv"}));
+    a.download="transaksi-"+bln+".csv";document.body.appendChild(a);a.click();a.remove();
+  }else{
+    const w=window.open("","_blank");if(!w){toast("Izinkan pop-up untuk mencetak",true);return}
+    w.document.write('<title>Transaksi '+bln+'</title><style>body{font:12px sans-serif}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:4px}</style><h3>Office Noval \u00b7 Transaksi '+bln+'</h3><table><tr>'+H.map(x=>'<th>'+x+'</th>').join('')+'</tr>'+R.map(r=>'<tr>'+r.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join('')+'</table>');
+    w.document.close();w.print();
+  }
+}
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+function isiLoginShift(){const s=$("lgShift");s.innerHTML=SHIFTS.map(x=>`<option value="${x.n}">Shift ${x.n} (${x.a}\u2013${x.b})</option>`).join("");s.value=shiftNow().n;$("lgUser").onkeydown=e=>{if(e.key==="Enter")masuk()}}
 function keluar(){ask("Keluar dari akun "+KASIR+"?",()=>{S.user="";save();$("lgUser").value="";$("lgPw").value="";$("login").style.display="flex"})}
 function rPegawai(){
   const man=S.pegawai||[];
@@ -1730,10 +1811,11 @@ async function absenPulang(){
 function hapusAbsen(id){ask("Hapus data absensi ini?",()=>{S.absen=absList().filter(x=>x.id!==id);save();rAbsen();toast("Data absensi dihapus")})}
 $("abMasuk").onclick=absenMasuk;$("abPulang").onclick=absenPulang;
 $("abTanpa").onclick=()=>{const a=absSaya(today(),shiftNow().n);window.fotoSkip=true;if(!a)absenMasuk();else if(!a.pulang)absenPulang();else{window.fotoSkip=false;toast("Absen shift ini sudah lengkap",true)}};
-$("lgBtn").onclick=masuk;$("logout").onclick=keluar;$("pbKeluar").onclick=keluar;
+$("lgBtn").onclick=masuk;$("logBtn").onclick=showLog;$("cariBtn").onclick=cariTrx;$("rekapBtn").onclick=rekapAdmin;$("logout").onclick=keluar;$("pbKeluar").onclick=keluar;
 $("lgPw").addEventListener("keydown",e=>{if(e.key==="Enter")masuk()});
 $("lgUser").addEventListener("keydown",e=>{if(e.key==="Enter")$("lgPw").focus()});
-if(S.users){Object.keys(S.users).forEach(k=>{if(!AKUN_RESMI[k]||S.users[k].pw!==AKUN_RESMI[k].pw)delete S.users[k]});if(S.user&&!S.users[S.user])S.user="";save()}
+if(S.user&&!(S.users&&S.users[S.user]))S.user="";save();
+isiLoginShift();
 if(S.user&&S.users&&S.users[S.user])mulai();else $("login").style.display="flex";
 function pilihShift(n){S.shiftAktif=n;S.shiftTgl=today();lTab=null;save();$("shiftSel").value=n;closeMod();refresh()}
 $("pbShift").style.cursor="pointer";$("pbShift").title="Ganti shift";
@@ -1815,11 +1897,12 @@ const LOKAL=["tema","temaV","grad","gradV","kolaps","pin","user","users","shiftA
 const KOL={
   trx:{c:"kasir_trx",id:x=>String(x.id),urut:(p,q)=>q.id-p.id},
   laporan:{c:"kasir_laporan",id:x=>x.tgl+"_"+x.shift,urut:(p,q)=>(q.tgl+" "+(q.jam||""))>(p.tgl+" "+(p.jam||""))?1:-1},
+  log:{c:"kasir_log",id:x=>String(x.id),urut:(p,q)=>q.id-p.id},
   absen:{c:"kasir_absen",id:x=>String(x.id),urut:(p,q)=>p.id-q.id}
 };
 const META = doc(db,"kasir_meta","utama"), LAMA = doc(db,"kasir","data");
-const sk = {meta:{},trx:{},laporan:{},absen:{}};    // yang terakhir diketahui ada di cloud
-const jauh = {meta:{},trx:{},laporan:{},absen:{}};  // data terbaru dari cloud
+const sk = {meta:{},trx:{},laporan:{},absen:{},log:{}};    // yang terakhir diketahui ada di cloud
+const jauh = {meta:{},trx:{},laporan:{},absen:{},log:{}};  // data terbaru dari cloud
 const awal = new Set();
 let siap=false, primer=true, adaMeta=false, migJalan=false, sedang=false, ulang=false, tmr=null, pend=false;
 
@@ -1893,6 +1976,7 @@ function terapkan(){
     if(!kotor && lj!==jauh.meta[i]){ S[i]=JSON.parse(jauh.meta[i]); ubah=true; }
   }
   sk.meta={...jauh.meta};
+  if(window.auditReset) window.auditReset();
   if(ubah){ try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){} tryRefresh(); }
 }
 
@@ -1909,7 +1993,7 @@ async function migrasi(){
 }
 
 function lanjut(){
-  if(awal.size<4) return;
+  if(awal.size<Object.keys(KOL).length+1) return;
   if(!siap){
     if(adaMeta){ terapkan(); primer=false; siap=true; kirim(); }
     else migrasi();
