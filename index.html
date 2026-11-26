@@ -1736,7 +1736,24 @@ function ambilFoto(label){
       const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>done(kecil(img,img.width,img.height));img.onerror=()=>done(null);img.src=r.result};
       r.onerror=()=>done(null);r.readAsDataURL(file)};
     f.oncancel=()=>done(null);
-    f.click(); // langsung buka kamera bawaan HP
+    const laptop=!(window.matchMedia&&matchMedia("(pointer:coarse)").matches);
+    if(laptop&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
+      // LAPTOP/PC: buka webcam langsung (live preview), bukan file picker
+      navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:{ideal:640},height:{ideal:480}},audio:false}).then(stream=>{
+        const stop=()=>stream.getTracks().forEach(t=>t.stop());
+        openMod(`<h3>${esc(label)}</h3><video id="camVid" autoplay playsinline muted style="width:100%;border-radius:12px;background:#000;transform:scaleX(-1)"></video><div class="mu" style="text-align:center">Hadapkan wajah ke kamera lalu klik Ambil Foto</div><div class="actions" style="margin-top:14px"><button class="btn ghost" id="camBatal">Batal</button><button class="btn main" id="camAmbil">Ambil Foto</button></div>`);
+        const v=$("camVid");v.srcObject=stream;
+        window.modClose=()=>{stop();done(null)};
+        $("camBatal").onclick=()=>closeMod();
+        $("camAmbil").onclick=()=>{
+          if(!v.videoWidth)return toast("Kamera belum siap, tunggu sebentar",true);
+          const hasil=kecil(v,v.videoWidth,v.videoHeight);
+          window.modClose=null;stop();closeMod();done(hasil);
+        };
+      }).catch(()=>{toast("Kamera laptop tidak bisa dibuka. Izinkan akses kamera di browser (harus HTTPS).",true);f.click()});
+      return;
+    }
+    f.click(); // HP: langsung buka kamera bawaan
   });
 }
 function pangkasFoto(){const batas=Date.now()-30*864e5;absList().forEach(a=>{if(new Date(a.masuk).getTime()<batas){delete a.foto;delete a.fotoPulang}})}
@@ -1767,7 +1784,7 @@ function rAbsen(){
     st("Pulang",a&&a.pulang?hm(a.pulang):"--:--",a&&a.pulang?"Durasi "+durTxt(Math.round((new Date(a.pulang)-new Date(a.masuk))/60000)):(a?"Belum pulang":"-"));
   $("abMasuk").disabled=!!a;
   $("abPulang").disabled=!a||!!a.pulang;
-  $("abLok").innerHTML=a&&a.lokasi?"Lokasi masuk: "+lokTxt(a.lokasi):"Tekan tombol absen: kamera HP langsung terbuka untuk selfie, lokasi diambil otomatis.";
+  $("abLok").innerHTML=a&&a.lokasi?"Lokasi masuk: "+lokTxt(a.lokasi):"Tekan tombol absen: kamera (HP maupun laptop) langsung terbuka untuk selfie, lokasi diambil otomatis.";
   // rekap bulan ini
   const bln=today().slice(0,7),mine=absList().filter(x=>x.kasir===KASIR&&x.tgl.startsWith(bln));
   $("abRekapNama").textContent=KASIR;
