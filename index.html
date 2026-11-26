@@ -1722,20 +1722,22 @@ const durTxt=m=>m>=60?Math.floor(m/60)+" j "+pad(m%60)+" m":m+" m";
 const tglPendek=t=>{const[y,m,d]=t.split("-");return d+"/"+m+"/"+y};
 let absTimer=null,absLok=null;
 function ambilFoto(label){
+  window.lokPre=ambilLokasi(); // lokasi dideteksi bersamaan dengan kamera dibuka
   if(window.fotoSkip){window.fotoSkip=false;return Promise.resolve("TANPA")}
   return new Promise(res=>{
     const f=$("abFile");f.value="";let fin=false;
     const done=v=>{if(fin)return;fin=true;f.onchange=null;f.oncancel=null;res(v)};
-    const kecil=(src,sw,sh)=>{
+    const kecil=(src,sw,sh,lok)=>{
       const k=Math.min(1,400/Math.max(sw,sh)),w=Math.round(sw*k),h=Math.round(sh*k);
       const c=document.createElement("canvas");c.width=w;c.height=h;const x=c.getContext("2d");
       x.drawImage(src,0,0,w,h);
       const d=new Date(),t=label+" · "+pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear()+" "+pad(d.getHours())+":"+pad(d.getMinutes());
-      x.fillStyle="rgba(0,0,0,.55)";x.fillRect(0,h-22,w,22);x.fillStyle="#fff";x.font="12px sans-serif";x.fillText(t,6,h-7);
+      const lt=lok?"Lokasi: "+lok.lat+", "+lok.lng+" (±"+lok.akurasi+" m)":"Lokasi: tidak terdeteksi";
+      x.fillStyle="rgba(0,0,0,.55)";x.fillRect(0,h-38,w,38);x.fillStyle="#fff";x.font="12px sans-serif";x.fillText(t,6,h-22);x.fillText(lt,6,h-7);
       return c.toDataURL("image/jpeg",.6);
     };
     f.onchange=()=>{const file=f.files&&f.files[0];if(!file)return done(null);
-      const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>done(kecil(img,img.width,img.height));img.onerror=()=>done(null);img.src=r.result};
+      const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>window.lokPre.then(l=>done(kecil(img,img.width,img.height,l)));img.onerror=()=>done(null);img.src=r.result};
       r.onerror=()=>done(null);r.readAsDataURL(file)};
     f.oncancel=()=>done(null);
     const laptop=!(window.matchMedia&&matchMedia("(pointer:coarse)").matches);
@@ -1749,8 +1751,8 @@ function ambilFoto(label){
         $("camBatal").onclick=()=>closeMod();
         $("camAmbil").onclick=()=>{
           if(!v.videoWidth)return toast("Kamera belum siap, tunggu sebentar",true);
-          const hasil=kecil(v,v.videoWidth,v.videoHeight);
-          window.modClose=null;stop();closeMod();done(hasil);
+          const bt=$("camAmbil");bt.disabled=true;bt.textContent="Mengambil lokasi...";
+          window.lokPre.then(l=>{const hasil=kecil(v,v.videoWidth,v.videoHeight,l);window.modClose=null;stop();closeMod();done(hasil)});
         };
       }).catch(()=>{toast("Kamera laptop tidak bisa dibuka. Izinkan akses kamera di browser (harus HTTPS).",true);f.click()});
       return;
@@ -1817,7 +1819,7 @@ async function absenMasuk(){
   const foto=await ambilFoto(KASIR+" · Masuk");
   if(!foto)return toast("Foto selfie wajib untuk absen",true);
   const b=$("abMasuk");b.disabled=true;b.textContent="Mengambil lokasi...";
-  const lok=await ambilLokasi();
+  const lok=await (window.lokPre||ambilLokasi());
   {const e=cekRadius(lok);if(e){b.disabled=false;b.textContent="Absen Masuk";return toast(e,true)}}
   const now=new Date(),telat=Math.max(0,now.getHours()*60+now.getMinutes()-sh.mulai);
   pangkasFoto();
@@ -1833,7 +1835,7 @@ async function absenPulang(){
   const foto=await ambilFoto(KASIR+" · Pulang");
   if(!foto)return toast("Foto selfie wajib untuk absen",true);
   const b=$("abPulang");b.disabled=true;b.textContent="Mengambil lokasi...";
-  const lok=await ambilLokasi();
+  const lok=await (window.lokPre||ambilLokasi());
   {const e=cekRadius(lok);if(e){b.disabled=false;b.textContent="Absen Pulang";return toast(e,true)}}
   a.pulang=new Date().toISOString();a.lokasiPulang=lok;a.lokManualPulang=$("abLokManual").value.trim();a.fotoPulang=foto==="TANPA"?null:foto;a.tanpaFotoPulang=foto==="TANPA";
   const k=$("abKet").value.trim();if(k)a.ket=(a.ket?a.ket+" | ":"")+k;
