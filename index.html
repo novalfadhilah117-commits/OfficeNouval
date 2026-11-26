@@ -577,6 +577,8 @@ body.mini #miniTog svg{transform:rotate(180deg)}}
         <div class="abs-btns"><button class="btn main" id="abMasuk">Absen Masuk</button><button class="btn out" id="abPulang">Absen Pulang</button></div>
         <div class="mu" id="abLok" style="margin-top:10px"></div>
         <button class="sm" id="abTanpa" style="margin-top:8px;width:100%">Kamera bermasalah? Absen tanpa foto</button>
+        <div class="mu" id="abToko" style="margin-top:12px"></div>
+        <button class="sm" id="abSetToko" style="margin-top:4px;width:100%">Set lokasi toko di sini (pakai HP, saat berada di toko)</button>
       </div>
     </div>
     <div>
@@ -1768,6 +1770,17 @@ function ambilLokasi(){
       ()=>res(null),{enableHighAccuracy:true,timeout:8000,maximumAge:30000});
   });
 }
+function jarakM(a,b){const R=6371000,r=x=>x*Math.PI/180,dLa=r(b.lat-a.lat),dLo=r(b.lng-a.lng),h=Math.sin(dLa/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+const dariHP=()=>!!(window.matchMedia&&matchMedia("(pointer:coarse)").matches);
+// Batas lokasi: hanya berlaku di HP & bila lokasi toko sudah diset. Laptop tidak dibatasi (tidak punya GPS akurat).
+function cekRadius(lok){
+  const t=S.tokoLok;if(!t||!dariHP())return null;
+  if(!lok)return "Lokasi tidak terdeteksi. Aktifkan GPS & izinkan lokasi, lalu coba lagi";
+  const j=Math.round(jarakM(lok,t));
+  if(j-(lok.akurasi||0)>t.radius)return "Kamu di luar area toko (±"+j+" m dari toko, batas "+t.radius+" m). Absen ditolak";
+  return null;
+}
+function infoToko(){const t=S.tokoLok;$("abToko").textContent=t?"Lokasi toko sudah diset · batas absen di HP: "+t.radius+" m":"Lokasi toko belum diset (absen belum dibatasi lokasi)"}
 function lokTxt(l){return l?`<a href="https://maps.google.com/?q=${l.lat},${l.lng}" target="_blank" rel="noopener" style="color:var(--accent)">lihat lokasi</a>`:"-"}
 function tickAbsen(){
   if(cur!=="absen"){clearInterval(absTimer);absTimer=null;return}
@@ -1776,7 +1789,7 @@ function tickAbsen(){
 function rAbsen(){
   const sh=shiftNow(),a=absSaya(today(),sh.n);
   $("abSub").textContent=tglPanjang()+" · Shift "+sh.n+" ("+sh.a+"–"+sh.b+") · "+KASIR;
-  $("abTgl").textContent=tglPanjang();tickAbsen();
+  $("abTgl").textContent=tglPanjang();tickAbsen();infoToko();
   if(!absTimer)absTimer=setInterval(tickAbsen,1000);
   const st=(t,v,s)=>`<div class="stat"><small>${t}</small><b>${v}</b><span>${s}</span></div>`;
   $("abStatus").innerHTML=
@@ -1805,6 +1818,7 @@ async function absenMasuk(){
   if(!foto)return toast("Foto selfie wajib untuk absen",true);
   const b=$("abMasuk");b.disabled=true;b.textContent="Mengambil lokasi...";
   const lok=await ambilLokasi();
+  {const e=cekRadius(lok);if(e){b.disabled=false;b.textContent="Absen Masuk";return toast(e,true)}}
   const now=new Date(),telat=Math.max(0,now.getHours()*60+now.getMinutes()-sh.mulai);
   pangkasFoto();
   const rec={id:Date.now(),tgl:today(),shift:sh.n,kasir:KASIR,masuk:now.toISOString(),pulang:null,telat,lokasi:lok,foto:foto==="TANPA"?null:foto,tanpaFoto:foto==="TANPA",ket:$("abKet").value.trim(),lokManual:$("abLokManual").value.trim()};
@@ -1820,12 +1834,20 @@ async function absenPulang(){
   if(!foto)return toast("Foto selfie wajib untuk absen",true);
   const b=$("abPulang");b.disabled=true;b.textContent="Mengambil lokasi...";
   const lok=await ambilLokasi();
+  {const e=cekRadius(lok);if(e){b.disabled=false;b.textContent="Absen Pulang";return toast(e,true)}}
   a.pulang=new Date().toISOString();a.lokasiPulang=lok;a.lokManualPulang=$("abLokManual").value.trim();a.fotoPulang=foto==="TANPA"?null:foto;a.tanpaFotoPulang=foto==="TANPA";
   const k=$("abKet").value.trim();if(k)a.ket=(a.ket?a.ket+" | ":"")+k;
   if(!simpanAbsen()){a.pulang=null;a.fotoPulang=null}
   b.textContent="Absen Pulang";$("abKet").value="";$("abLokManual").value="";rAbsen();toast("Absen pulang tercatat");
 }
 function hapusAbsen(id){ask("Hapus data absensi ini?",()=>{S.absen=absList().filter(x=>x.id!==id);save();rAbsen();toast("Data absensi dihapus")})}
+$("abSetToko").onclick=()=>ask("Jadikan lokasi kamu sekarang sebagai lokasi toko?",async()=>{
+  const b=$("abSetToko");b.disabled=true;b.textContent="Mengambil lokasi...";
+  const l=await ambilLokasi();b.disabled=false;b.textContent="Set lokasi toko di sini (pakai HP, saat berada di toko)";
+  if(!l)return toast("Lokasi tidak terdeteksi. Aktifkan GPS & izinkan lokasi",true);
+  if(l.akurasi>100)return toast("Akurasi GPS kurang bagus (±"+l.akurasi+" m). Coba di tempat terbuka",true);
+  S.tokoLok={lat:l.lat,lng:l.lng,radius:100};simpanAbsen();infoToko();toast("Lokasi toko tersimpan (batas 100 m)");
+});
 $("abMasuk").onclick=absenMasuk;$("abPulang").onclick=absenPulang;
 $("abTanpa").onclick=()=>{const a=absSaya(today(),shiftNow().n);window.fotoSkip=true;if(!a)absenMasuk();else if(!a.pulang)absenPulang();else{window.fotoSkip=false;toast("Absen shift ini sudah lengkap",true)}};
 $("lgBtn").onclick=masuk;$("logBtn").onclick=showLog;$("cariBtn").onclick=cariTrx;$("rekapBtn").onclick=rekapAdmin;$("logout").onclick=keluar;$("pbKeluar").onclick=keluar;
