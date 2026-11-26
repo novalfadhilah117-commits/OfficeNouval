@@ -91,6 +91,10 @@ main{padding:16px}.g2,.in-grid,.row{grid-template-columns:1fr}}
 
 .abs-clock{text-align:center;padding:8px 0 4px}.abs-clock .jm{font-size:44px;font-weight:700;letter-spacing:1px;font-variant-numeric:tabular-nums}.abs-clock small{color:var(--mute);font-size:13px}
 .abs-st{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}.abs-st .stat{text-align:center}
+.abmap{height:170px;border-radius:12px;overflow:hidden;border:1px solid rgba(128,128,128,.35);background:rgba(128,128,128,.12);margin-top:12px}
+.abmap iframe{width:100%;height:100%;border:0;display:block}
+.abmap-ph{height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;color:var(--mute);font-size:13px}
+.abmap-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0 12px;color:var(--mute)}
 .abs-btns{display:grid;grid-template-columns:1fr 1fr;gap:12px}.abs-btns .btn{padding:18px 12px;font-size:16px}.btn.out{background:var(--bad);color:#3b0505}
 .tag.t{background:rgba(255,122,122,.15);color:var(--bad)}
 .fth{width:40px;height:40px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid var(--line);display:block;margin-top:4px}.li .fth{margin:0 10px 0 0}
@@ -573,6 +577,8 @@ body.mini #miniTog svg{transform:rotate(180deg)}}
         <div class="abs-st" id="abStatus"></div>
         <div class="full"><label>Catatan <small>(opsional, mis. izin/lupa absen)</small></label><input id="abKet" placeholder="Catatan absen"></div>
         <div class="full"><label>Lokasi <small>(GPS otomatis; isi manual bila GPS tidak aktif)</small></label><input id="abLokManual" placeholder="Contoh: Toko cabang 1"></div>
+        <div id="abMap" class="abmap"><div class="abmap-ph">Mendeteksi lokasi...</div></div>
+        <div class="abmap-bar"><small id="abMapTxt"></small><button class="sm" id="abMapRef" type="button">Perbarui lokasi</button></div>
         <input type="file" accept="image/*" capture="user" id="abFile" style="display:none">
         <div class="abs-btns"><button class="btn main" id="abMasuk">Absen Masuk</button><button class="btn out" id="abPulang">Absen Pulang</button></div>
         <div class="mu" id="abLok" style="margin-top:10px"></div>
@@ -1783,7 +1789,35 @@ function cekRadius(lok){
   return null;
 }
 function infoToko(){const t=S.tokoLok;$("abToko").textContent=t?"Lokasi toko sudah diset · batas absen di HP: "+t.radius+" m":"Lokasi toko belum diset (absen belum dibatasi lokasi)"}
-function lokTxt(l){return l?`<a href="https://maps.google.com/?q=${l.lat},${l.lng}" target="_blank" rel="noopener" style="color:var(--accent)">lihat lokasi</a>`:"-"}
+function lokTxt(l){return l?`<a href="https://maps.google.com/?q=${l.lat},${l.lng}" onclick="return bukaPeta(${l.lat},${l.lng})" target="_blank" rel="noopener" style="color:var(--accent)">lihat lokasi</a>`:"-"}
+/* peta kecil (OpenStreetMap, tanpa API key) */
+const petaUrl=l=>{const d=.0025;return "https://www.openstreetmap.org/export/embed.html?bbox="+[l.lng-d,l.lat-d,l.lng+d,l.lat+d].join(",")+"&layer=mapnik&marker="+l.lat+","+l.lng};
+const petaHtml=l=>`<iframe src="${petaUrl(l)}" loading="lazy" referrerpolicy="no-referrer" title="Peta lokasi"></iframe>`;
+function bukaPeta(lat,lng){
+  openMod(`<h3>Lokasi absen</h3><div class="abmap" style="height:300px;margin-top:0">${petaHtml({lat,lng})}</div><div class="mu" style="margin-top:8px">${lat}, ${lng}</div><div class="actions" style="margin-top:14px"><a class="btn ghost" href="https://maps.google.com/?q=${lat},${lng}" target="_blank" rel="noopener">Buka di Google Maps</a><button class="btn main" onclick="closeMod()">Tutup</button></div>`);
+  return false;
+}
+let petaTok=0,petaLive=null;
+async function petaAbsen(paksa){
+  const box=$("abMap"),txt=$("abMapTxt");if(!box)return;
+  const a=absSaya(today(),shiftNow().n),tok=++petaTok;
+  let l=null,lab="";
+  if(!paksa&&a&&a.pulang&&(a.lokasiPulang||a.lokasi)){l=a.lokasiPulang||a.lokasi;lab="Lokasi absen pulang"}
+  else{
+    if(!paksa&&petaLive&&Date.now()-petaLive.t<6e4){l=petaLive.l}
+    else{
+      if(!box.dataset.u)box.innerHTML='<div class="abmap-ph">Mendeteksi lokasi...</div>';
+      txt.textContent="";
+      l=await ambilLokasi();if(tok!==petaTok||cur!=="absen")return;
+      if(l)petaLive={l,t:Date.now()};
+    }
+    lab="Lokasi kamu sekarang";
+  }
+  if(!l){box.dataset.u="";box.innerHTML='<div class="abmap-ph">Lokasi belum terdeteksi.<br>Aktifkan GPS &amp; izinkan lokasi, lalu klik Perbarui lokasi.</div>';txt.textContent="";return}
+  const u=petaUrl(l);
+  if(box.dataset.u!==u){box.dataset.u=u;box.innerHTML=petaHtml(l)}
+  txt.textContent=lab+" · "+l.lat+", "+l.lng+(l.akurasi?" (±"+l.akurasi+" m)":"");
+}
 function tickAbsen(){
   if(cur!=="absen"){clearInterval(absTimer);absTimer=null;return}
   const d=new Date();$("abJam").textContent=pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds());
@@ -1791,7 +1825,7 @@ function tickAbsen(){
 function rAbsen(){
   const sh=shiftNow(),a=absSaya(today(),sh.n);
   $("abSub").textContent=tglPanjang()+" · Shift "+sh.n+" ("+sh.a+"–"+sh.b+") · "+KASIR;
-  $("abTgl").textContent=tglPanjang();tickAbsen();infoToko();
+  $("abTgl").textContent=tglPanjang();tickAbsen();infoToko();petaAbsen();
   if(!absTimer)absTimer=setInterval(tickAbsen,1000);
   const st=(t,v,s)=>`<div class="stat"><small>${t}</small><b>${v}</b><span>${s}</span></div>`;
   $("abStatus").innerHTML=
@@ -1850,7 +1884,7 @@ $("abSetToko").onclick=()=>ask("Jadikan lokasi kamu sekarang sebagai lokasi toko
   if(l.akurasi>100)return toast("Akurasi GPS kurang bagus (±"+l.akurasi+" m). Coba di tempat terbuka",true);
   S.tokoLok={lat:l.lat,lng:l.lng,radius:100};simpanAbsen();infoToko();toast("Lokasi toko tersimpan (batas 100 m)");
 });
-$("abMasuk").onclick=absenMasuk;$("abPulang").onclick=absenPulang;
+$("abMasuk").onclick=absenMasuk;$("abPulang").onclick=absenPulang;$("abMapRef").onclick=()=>petaAbsen(true);
 $("abTanpa").onclick=()=>{const a=absSaya(today(),shiftNow().n);window.fotoSkip=true;if(!a)absenMasuk();else if(!a.pulang)absenPulang();else{window.fotoSkip=false;toast("Absen shift ini sudah lengkap",true)}};
 $("lgBtn").onclick=masuk;$("logBtn").onclick=showLog;$("cariBtn").onclick=cariTrx;$("rekapBtn").onclick=rekapAdmin;$("logout").onclick=keluar;$("pbKeluar").onclick=keluar;
 $("lgPw").addEventListener("keydown",e=>{if(e.key==="Enter")masuk()});
